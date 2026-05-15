@@ -1,0 +1,136 @@
+import { cn } from '@/lib/utils'
+import type { ChatMessageWithUser, ReactionType } from '@/lib/types/chat'
+import { MessageContextMenu } from './message-context-menu'
+import { FileAttachment } from './file-attachment'
+import { MessageReactions } from './message-reactions'
+import { ReactionPicker } from './reaction-picker'
+
+interface ChatMessageItemProps {
+  message: ChatMessageWithUser
+  currentUserId: string // Changed to use userId instead of username
+  showHeader: boolean
+  onDelete: (messageId: string) => void
+  onEdit: (messageId: string, content: string) => void
+  onReactionAdd: (messageId: string, reactionType: ReactionType) => void
+  onReactionRemove: (messageId: string, reactionType: ReactionType) => void
+}
+
+export const ChatMessageItem = ({ 
+  message, 
+  currentUserId, 
+  showHeader, 
+  onDelete, 
+  onEdit,
+  onReactionAdd,
+  onReactionRemove,
+}: ChatMessageItemProps) => {
+  const isOwnMessage = message.user.id === currentUserId
+
+  const handleReactionClick = (reactionType: ReactionType) => {
+    const existingReaction = message.reactions?.find(
+      (r) => r.type === reactionType && r.hasUserReacted
+    )
+    
+    // If user already has this reaction, remove it
+    if (existingReaction) {
+      onReactionRemove(message.id, reactionType)
+    } else {
+      // Otherwise, add the new reaction (will replace any existing different reaction)
+      onReactionAdd(message.id, reactionType)
+    }
+  }
+
+  return (
+    <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} group`}>
+      <MessageContextMenu
+        messageId={message.id}
+        messageContent={message.content}
+        createdAt={message.createdAt}
+        isOwnMessage={isOwnMessage}
+        onDelete={onDelete}
+        onEdit={onEdit}
+      >
+        <div
+          className={cn('max-w-[70%] w-fit flex flex-col gap-2', {
+            'items-end': isOwnMessage,
+            'items-start': !isOwnMessage,
+          })}
+        >
+          {showHeader && (
+            <div
+              className={cn('flex items-center gap-2 text-xs px-2', {
+                'justify-end flex-row-reverse': isOwnMessage,
+              })}
+            >
+              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                <span className="text-xs font-bold text-primary-foreground">{message.user.name.charAt(0).toUpperCase()}</span>
+              </div>
+              <span className="font-semibold font-sans text-foreground">{message.user.name}</span>
+              <span className="font-sans text-muted-foreground">
+                {new Date(message.createdAt).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true,
+                })}
+              </span>
+            </div>
+          )}
+          <div className="relative">
+            <div
+              className={cn(
+                'relative py-3 px-4 text-sm font-sans w-fit shadow-sm transition-all duration-200 group-hover:shadow-md',
+                isOwnMessage 
+                  ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md' 
+                  : 'bg-card text-card-foreground rounded-2xl rounded-bl-md border border-border'
+              )}
+            >
+              {/* Message bubble tail */}
+              <div className={cn(
+                'absolute w-3 h-3 transform rotate-45',
+                isOwnMessage 
+                  ? 'bg-primary bottom-0 right-0 translate-x-1 translate-y-1' 
+                  : 'bg-card border-r border-b border-border bottom-0 left-0 -translate-x-1 translate-y-1'
+              )}></div>
+              
+              {message.attachment ? (
+                <div className="space-y-3">
+                  <FileAttachment attachment={message.attachment} isOwnMessage={isOwnMessage} />
+                  {message.content && message.content !== `Sent ${message.attachment.fileName}` && (
+                    <div className="leading-relaxed">{message.content}</div>
+                  )}
+                </div>
+              ) : (
+                <div className="leading-relaxed">{message.content}</div>
+              )}
+              {message.isEdited && (
+                <div className={cn(
+                  "text-xs font-sans mt-1",
+                  isOwnMessage ? "text-primary-foreground/70" : "text-muted-foreground"
+                )}>
+                  (edited)
+                </div>
+              )}
+            </div>
+            
+            {/* Reaction Picker - shows on hover */}
+            <div className={cn(
+              'absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity',
+              isOwnMessage ? 'right-full mr-1' : 'left-full ml-1'
+            )}>
+              <ReactionPicker onReactionSelect={(type) => onReactionAdd(message.id, type)} />
+            </div>
+          </div>
+          
+          {/* Message Reactions */}
+          {message.reactions && message.reactions.length > 0 && (
+            <MessageReactions
+              reactions={message.reactions}
+              onReactionClick={handleReactionClick}
+              isOwnMessage={isOwnMessage}
+            />
+          )}
+        </div>
+      </MessageContextMenu>
+    </div>
+  )
+}
